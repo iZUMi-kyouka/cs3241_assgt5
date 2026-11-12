@@ -30,6 +30,14 @@ uses a different toolset; copy its validation approach, not its compiler setting
 - Keep unfinished-step placeholders until implementing the corresponding work;
   current screenshots legitimately show only the blue background.
 
+## C++ formatting
+
+Use Egyptian braces: opening braces stay on the same line as functions, classes,
+and control statements, with `} else {` on one line. `.clang-format` is authoritative:
+four spaces, no indentation tabs, and no one-line function/control-statement bodies.
+The user's Vim formats C/C++ files on save; Space f formats manually. Preserve
+C++11 compatibility and include ordering when formatting.
+
 ## Validation
 
 Linux prerequisites: `g++ make python3 freeglut3-dev libglu1-mesa-dev`; headless

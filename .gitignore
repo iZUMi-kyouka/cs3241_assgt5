@@ -11,3 +11,5 @@
 *.idb
 *.tlog/
 __pycache__/
+*.pdf
+*.swp

@@ -126,3 +126,95 @@ candidate commit to a temporary validation branch, watches Actions, removes the
 branch, and pushes main only after success. A failing candidate is blocked. Do
 not disable this hook or the server's four required checks to get a green-looking
 main branch. Fix the failure and validate the new candidate.
+
+## Local Vim and clangd
+
+Vim's C++ IDE configuration lives in `~/.vim/cpp-ide.vim` and
+`~/.vim/coc-settings.json`, loaded from `~/.vimrc`. Original settings were backed
+up under `~/.vim/backups/`. `:CppHelp` describes the mappings and maintenance.
+CoC talks directly to the installed clangd; do not also enable `coc-clangd` or
+another C++ language client, which would duplicate diagnostics and completion.
+
+**Use the real build flags.** F5/F6 run Bear with the strict Make Debug/Release
+build, refreshing the local `compile_commands.json`. The database and `.cache/`
+are excluded locally in `.git/info/exclude`; they contain machine-specific paths.
+Do not enable a newer C++ standard or define `WIN32` to silence Linux diagnostics.
+
+**Vim's default `:make` pipe can hide failure exit codes.** A command piped through
+`tee` may report tee's successful exit instead of the compiler's failure. The
+build helper temporarily redirects output straight to Vim's error file, preserving
+the command's exit status and restoring the original shell-pipe setting afterward.
+
+**clangd's CLI feature self-test can fail without a source error.** On this
+machine, `clangd --check=main.cpp` parsed the file, then reported two
+`ExtractFunction` tweak failures on break/continue statements while testing every
+token. These are refactoring self-test failures, not compiler diagnostics. The
+running language server was separately verified inside Vim: unsaved errors and
+unused-variable diagnostics, completion, semantic tokens, and definition jumps all
+work. Do not modify the assignment's switch statements to fix this CLI output.
+
+**CoC's `hasProvider` API does not support a `completion` feature name.** It can
+return false even when completion works. Test a real `textDocument/completion`
+request or the completion popup; `Vector3` member completions were verified.
+
+**clangd's `--fallback-style` expects a named style, not inline YAML.** An initial
+inline `{BasedOnStyle: LLVM, ...}` argument caused `getStyle()` to fail and fall
+back to LLVM's two-space defaults, bypassing the project style. Use
+`--fallback-style=LLVM` and put custom rules in `.clang-format`. This project now
+uses Egyptian braces and four spaces, and Vim enables C/C++ format-on-save.
+
+**Avoid Escape-prefix shortcuts in Vim.** The original IDE setup mapped
+`<Esc><Esc>` to clear search highlighting, with terminal key recognition sharing
+the one-second mapping timeout. This can make a single Escape appear unresponsive.
+That shortcut was removed (also explicitly unmapped on configuration reload).
+Search highlighting is now cleared with Space `/`; terminal Escape detection uses
+`ttimeoutlen=50`, and Insert/Select modes have non-recursive, no-wait Escape
+mappings. Terminal tests verified one Escape returns to Normal mode both with and
+without the completion popup, dismisses that popup, and preserves arrow keys.
+Existing Vim sessions must source `~/.vim/cpp-ide.vim` to load the fix.
+
+**Physical Escape can be intercepted by Zoom before it reaches Vim.** On this
+workstation, Escape still failed in the user's actual Ptyxis session even though
+terminal-injection tests passed. A live `getcharstr()` test, with `inputsave()`
+clearing queued keys, remained waiting after the physical Escape press. The
+session's mappings, `noinsertmode`, and timeout settings were correct.
+
+The actual conflict was GNOME custom shortcut `custom1`, named `ZMHKey65307`:
+its binding was bare `Escape`, and its command sent `keyPressed` to
+`com.zoom.HotKeyListener`. This globally consumed Escape. Its `binding` was set
+to an empty string, disabling only that shortcut. Original name, command, and
+binding were backed up in `~/.vim/backups/before-zoom-escape-fix-*/`.
+If this returns after Zoom changes its shortcuts, inspect GNOME custom bindings
+for a bare Escape assigned to Zoom before changing Vim mappings again. Do not
+map Enter to Escape: an initial `<CR>` result can just be queued command input.
+
+## Step 1–2 review checkpoint (2026-11-12)
+
+The first intersection/ambient-colour implementation passed strict Debug but
+failed strict Release at the LTO stage: GCC emitted `-Werror=uninitialized` for
+`r` and `g` in `renderScene`. This is a compiler diagnostic, not by itself proof
+that `rayTrace` leaves its outputs unset; inspect the output-assignment paths
+before attributing a cause. At this review checkpoint it remains unresolved.
+Do not suppress the warning or drop LTO/strictness to conceal it. Targeted
+geometry review also found missing hit/normal outputs, incomplete positive-root
+selection, and selection by object iteration order instead of nearest distance.
+
+## Strict Egyptian-brace saves
+
+**A comment between a function header and `{` prevents ordinary clang-format
+from attaching that brace.** The starter's `Sphere::intersectWithRay` contract
+comment occupied exactly that position. Neither `BreakBeforeBraces: Attach` nor
+repeating the normal formatting command removes this exception.
+
+`~/.vim/cpp-ide.vim` now uses a synchronous `BufWritePre` clang-format hook for
+C/C++ buffers, independently of language-server readiness or save-handler timeouts.
+Before formatting it moves intervening standalone comments inside the following
+function/control/type block, preserving their text. Vim syntax groups protect
+comments and string/raw-string contents from being mistaken for actual braces.
+CoC's separate C/C++ save-format handlers are disabled to avoid double formatting;
+Space f and `:CppFormat` use the same synchronous formatter as saving.
+
+Tests saved a copy of the current `main.cpp` with no detached opening braces,
+preserved comment text and raw-string contents, and verified repeated saves are
+stable. Formatter failure aborts a save rather than silently writing unformatted
+output. Reload the helper with `:source ~/.vim/cpp-ide.vim` in existing sessions.

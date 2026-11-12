@@ -1,4 +1,4 @@
-// CS3241Lab5.cpp 
+// CS3241Lab5.cpp
 #include <cmath>
 #include <iostream>
 #ifdef _WIN32
@@ -20,320 +20,391 @@ using namespace std;
 #define MAX_RT_LEVEL 50
 #define NUM_SCENE 2
 
-float* pixelBuffer = new float[WINWIDTH * WINHEIGHT * 3];
+float *pixelBuffer = new float[WINWIDTH * WINHEIGHT * 3];
 
 class Ray { // a ray that start with "start" and going in the direction "dir"
-public:
-	Vector3 start, dir;
+  public:
+    Vector3 start, dir;
 };
 
 class RtObject {
 
-public:
-	virtual ~RtObject() {}
-	virtual double intersectWithRay(Ray, Vector3& pos, Vector3& normal) = 0; // return a -ve if there is no intersection. Otherwise, return the smallest postive value of t
+  public:
+    virtual ~RtObject() {
+    }
+    virtual double
+    intersectWithRay(Ray, Vector3 &pos,
+                     Vector3 &normal) = 0; // return a -ve if there is no intersection. Otherwise,
+                                           // return the smallest postive value of t
 
-	// Materials Properties
-	double ambiantReflection[3] ;
-	double diffusetReflection[3] ;
-	double specularReflection[3] ;
-	double speN = 300;
-
-
+    // Materials Properties
+    double ambiantReflection[3];
+    double diffusetReflection[3];
+    double specularReflection[3];
+    double speN = 300;
 };
 
 class Sphere : public RtObject {
 
-	Vector3 center_;
-	double r_;
-public:
-	Sphere(Vector3 c, double r) { center_ = c; r_ = r; };
-	Sphere() {};
-	void set(Vector3 c, double r) { center_ = c; r_ = r; };
-	double intersectWithRay(Ray, Vector3& pos, Vector3& normal);
+    Vector3 center_;
+    double r_;
+
+  public:
+    Sphere(Vector3 c, double r) {
+        center_ = c;
+        r_ = r;
+    };
+    Sphere() {};
+    void set(Vector3 c, double r) {
+        center_ = c;
+        r_ = r;
+    };
+    double intersectWithRay(Ray, Vector3 &pos, Vector3 &normal);
 };
 
 RtObject **objList; // The list of all objects in the scene
 
-
 // Global Variables
 // Camera Settings
-Vector3 cameraPos(0,0,-500);
+Vector3 cameraPos(0, 0, -500);
 
 // assume the the following two vectors are normalised
-Vector3 lookAtDir(0,0,1);
-Vector3 upVector(0,1,0);
+Vector3 lookAtDir(0, 0, 1);
+Vector3 upVector(0, 1, 0);
 Vector3 leftVector(1, 0, 0);
 float focalLen = 500;
 
 // Light Settings
 
-Vector3 lightPos(900,1000,-1500);
-double ambiantLight[3] = { 0.4,0.4,0.4 };
-double diffusetLight[3] = { 0.7,0.7, 0.7 };
-double specularLight[3] = { 0.5,0.5, 0.5 };
+Vector3 lightPos(900, 1000, -1500);
+double ambiantLight[3] = {0.4, 0.4, 0.4};
+double diffusetLight[3] = {0.7, 0.7, 0.7};
+double specularLight[3] = {0.5, 0.5, 0.5};
 
-
-double bgColor[3] = { 0.1,0.1,0.4 };
+double bgColor[3] = {0.1, 0.1, 0.4};
 
 int sceneNo = 0;
 
+class QuadraticResult {
+  public:
+    double x1;
+    double x2;
+};
 
-double Sphere::intersectWithRay(Ray r, Vector3& intersection, Vector3& normal)
-// return a -ve if there is no intersection. Otherwise, return the smallest postive value of t
-{
+QuadraticResult solveQuadraticEqn(double a, double b, double c) {
+    double x1 = (-b + sqrt(b * b - 4 * a * c)) / (2 * a);
+    double x2 = (-b - sqrt(b * b - 4 * a * c)) / (2 * a);
+    if (x1 < x2) {
+        return QuadraticResult{x1, x2};
+    }
 
-	// Step 1
-	(void)r;
-	(void)intersection;
-	(void)normal;
-
-	return -1;
+    return QuadraticResult{x2, x1};
 }
 
+double Sphere::intersectWithRay(Ray r, Vector3 &intersection, Vector3 &normal) {
+    // return a -ve if there is no intersection. Otherwise, return the smallest postive value of t
 
-void rayTrace(Ray ray, double& r, double& g, double& b, int fromObj = -1 ,int level = 0)
-{
-	// Step 4
-	(void)fromObj;
-	(void)level;
+    // Step 1
+    (void)r;
+    (void)intersection;
+    (void)normal;
 
-	int goBackGround = 1, i = 0;
+    double alpha = dot_prod(r.dir, r.dir);
+    double beta = dot_prod(r.dir * 2, r.start - this->center_);
+    double gamma = (r.start - this->center_).lengthsqr() - this->r_ * this->r_;
 
-	Vector3 intersection, normal;
-	Vector3 lightV;
-	Vector3 viewV;
-	Vector3 lightReflectionV;
-	Vector3 rayReflectionV;
+    double D = (beta * beta) - 4 * alpha * gamma;
+    if (D <= 0) {
+        return -1;
+    }
 
-	Ray newRay;
-	double mint = DBL_MAX, t;
-	(void)mint;
+    QuadraticResult q = solveQuadraticEqn(alpha, beta, gamma);
+    double t = q.x1 < 0 ? q.x2 : q.x1;
+    if (t < 0) {
+        return -1;
+    }
 
+    intersection = r.start + r.dir * t;
+    // normal is the normal at the curved surface
+    normal = (intersection - this->center_);
+    normal.normalize();
 
-	//for (i = 0; i < NUM_OBJECTS; i++)
-	{
-		if ((t = objList[i]->intersectWithRay(ray, intersection, normal)) > 0)
-		{
-			r = g = b = 1.0; 			// Step 2 
-
-			// Step 3
-			goBackGround = 0;
-		}
-	}
-
-	if (goBackGround)
-	{
-		r = bgColor[0];
-		g = bgColor[1];
-		b = bgColor[2];
-	}
-
+    return t;
 }
 
-
-void drawInPixelBuffer(int x, int y, double r, double g, double b)
-{
-	pixelBuffer[(y*WINWIDTH + x) * 3] = (float)r;
-	pixelBuffer[(y*WINWIDTH + x) * 3 + 1] = (float)g;
-	pixelBuffer[(y*WINWIDTH + x) * 3 + 2] = (float)b;
+double fAtt(double a, double b, double c, double d) {
+    return 1 / (a + b * d + c * d * d);
 }
 
-void renderScene()
-{
-	int x, y;
-	Ray ray;
-	double r, g, b;
+void rayTrace(Ray ray, double &r, double &g, double &b, int fromObj = -1, int level = 0) {
+    // Step 4
+    if (level > MAX_RT_LEVEL) {
+        return;
+    }
 
-	cout << "Rendering Scene " << sceneNo << " with resolution " << WINWIDTH << "x" << WINHEIGHT << "........... ";
-	auto time1 = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now().time_since_epoch()).count(); // marking the starting time
+    int goBackGround = 1, i = 0;
 
-	ray.start = cameraPos;
+    Vector3 intersection, normal;
+    Vector3 lightV;
+    Vector3 viewV;
+    Vector3 lightReflectionV;
+    Vector3 rayReflectionV;
 
-	Vector3 vpCenter = cameraPos + lookAtDir * focalLen;  // viewplane center
-	Vector3 startingPt = vpCenter + leftVector * (-WINWIDTH / 2.0) + upVector * (-WINHEIGHT / 2.0);
-	Vector3 currPt;
+    Ray newRay;
+    double mint = DBL_MAX, t;
 
-	for(x=0;x<WINWIDTH;x++)
-		for (y = 0; y < WINHEIGHT; y++)
-		{
-			currPt = startingPt + leftVector*x + upVector*y;
-			ray.dir = currPt-cameraPos;
-			ray.dir.normalize();
-			rayTrace(ray, r, g, b);
-			drawInPixelBuffer(x, y, r, g, b);
-		}
+    for (i = 0; i < NUM_OBJECTS; i++) {
+        if (i == fromObj) {
+            continue;
+        }
 
-	auto time2 = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now().time_since_epoch()).count(); // marking the ending time
+        if ((t = objList[i]->intersectWithRay(ray, intersection, normal)) > 0) {
+            if (t < mint) {
+                mint = t;
+            } else {
+                continue;
+            }
 
-	cout << "Done! \nRendering time = " << time2 - time1 << "ms" << endl << endl;
+            r = ambiantLight[0] * objList[i]->ambiantReflection[0];
+            g = ambiantLight[1] * objList[i]->ambiantReflection[1];
+            b = ambiantLight[2] * objList[i]->ambiantReflection[2];
+
+            // Step 3
+            goBackGround = 0;
+
+            // Handle diffuse reflection
+            double distance = (lightPos - intersection).length();
+            double f_att = fAtt((double)1, (double)0, (double)0, distance);
+
+            Vector3 L = lightPos - intersection;
+            L.normalize();
+            double N_dot_L = fmax(0, dot_prod(normal, L));
+            const double *K_d = objList[i]->diffusetReflection;
+
+            r += f_att * diffusetLight[0] * K_d[0] * N_dot_L;
+            g += f_att * diffusetLight[1] * K_d[1] * N_dot_L;
+            b += f_att * diffusetLight[2] * K_d[2] * N_dot_L;
+
+            // Handle specular reflection
+            double N_prime = dot_prod(normal, L);
+            Vector3 N_prime_vec = normal * N_prime;
+            Vector3 S = N_prime_vec - L;
+            Vector3 R = L + S * 2;
+            R.normalize();
+            double maxSpecular = pow(fmax(0, dot_prod(R, -ray.dir)), objList[i]->speN);
+            const double *K_s = objList[i]->specularReflection;
+
+            r += f_att * specularLight[0] * K_s[0] * maxSpecular;
+            g += f_att * specularLight[1] * K_s[1] * maxSpecular;
+            b += f_att * specularLight[2] * K_s[2] * maxSpecular;
+
+            Ray reflectionRay = Ray{intersection, R};
+            rayTrace(reflectionRay, lightReflectionV.x[0], lightReflectionV.x[1],
+                     lightReflectionV.x[2], i, level + 1);
+            r += K_s[0] * lightReflectionV.x[0];
+            g += K_s[1] * lightReflectionV.x[1];
+            b += K_s[2] * lightReflectionV.x[2];
+        }
+    }
+
+    if (goBackGround) {
+        r = bgColor[0];
+        g = bgColor[1];
+        b = bgColor[2];
+    }
 }
 
+void drawInPixelBuffer(int x, int y, double r, double g, double b) {
+    pixelBuffer[(y * WINWIDTH + x) * 3] = (float)r;
+    pixelBuffer[(y * WINWIDTH + x) * 3 + 1] = (float)g;
+    pixelBuffer[(y * WINWIDTH + x) * 3 + 2] = (float)b;
+}
 
-void display(void)
-{
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glDrawPixels(WINWIDTH, WINHEIGHT, GL_RGB, GL_FLOAT, pixelBuffer);
-	glutSwapBuffers();
-	glFlush ();
+void renderScene() {
+    int x, y;
+    Ray ray;
+    double r, g, b;
+
+    cout << "Rendering Scene " << sceneNo << " with resolution " << WINWIDTH << "x" << WINHEIGHT
+         << "........... ";
+    auto time1 =
+        chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now().time_since_epoch())
+            .count(); // marking the starting time
+
+    ray.start = cameraPos;
+
+    Vector3 vpCenter = cameraPos + lookAtDir * focalLen; // viewplane center
+    Vector3 startingPt = vpCenter + leftVector * (-WINWIDTH / 2.0) + upVector * (-WINHEIGHT / 2.0);
+    Vector3 currPt;
+
+    for (x = 0; x < WINWIDTH; x++)
+        for (y = 0; y < WINHEIGHT; y++) {
+            currPt = startingPt + leftVector * x + upVector * y;
+            ray.dir = currPt - cameraPos;
+            ray.dir.normalize();
+            rayTrace(ray, r, g, b);
+            drawInPixelBuffer(x, y, r, g, b);
+        }
+
+    auto time2 =
+        chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now().time_since_epoch())
+            .count(); // marking the ending time
+
+    cout << "Done! \nRendering time = " << time2 - time1 << "ms" << endl << endl;
+}
+
+void display(void) {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDrawPixels(WINWIDTH, WINHEIGHT, GL_RGB, GL_FLOAT, pixelBuffer);
+    glutSwapBuffers();
+    glFlush();
 #ifdef _WIN32
-	const bool checkGL = GetEnvironmentVariableA("CS3241_CHECK_GL", nullptr, 0) > 0;
+    const bool checkGL = GetEnvironmentVariableA("CS3241_CHECK_GL", nullptr, 0) > 0;
 #else
-	const bool checkGL = std::getenv("CS3241_CHECK_GL") != nullptr;
+    const bool checkGL = std::getenv("CS3241_CHECK_GL") != nullptr;
 #endif
-	if (checkGL) {
-		const GLenum error = glGetError();
-		if (error != GL_NO_ERROR) {
-			cerr << "OpenGL runtime error: " << error << endl;
-			exit(EXIT_FAILURE);
-		}
-		cout << "OpenGL frame check passed: scene " << sceneNo << endl;
-	}
-} 
-
-void reshape (int w, int h)
-{
-	glViewport (0, 0, (GLsizei) w, (GLsizei) h);
-
-	glMatrixMode (GL_PROJECTION);
-	glLoadIdentity();
-
-	glOrtho(-10, 10, -10, 10, -10, 10);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+    if (checkGL) {
+        const GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            cerr << "OpenGL runtime error: " << error << endl;
+            exit(EXIT_FAILURE);
+        }
+        cout << "OpenGL frame check passed: scene " << sceneNo << endl;
+    }
 }
 
+void reshape(int w, int h) {
+    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
 
-void setScene(int i = 0)
-{
-	if (i > NUM_SCENE)
-	{
-		cout << "Warning: Invalid Scene Number" << endl;
-		return;
-	}
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
 
-	if (i == 0)
-	{
-
-		((Sphere*)objList[0])->set(Vector3(-130, 80, 120), 100);
-		((Sphere*)objList[1])->set(Vector3(130, -80, -80), 100);
-		((Sphere*)objList[2])->set(Vector3(-130, -80, -80), 100);
-		((Sphere*)objList[3])->set(Vector3(130, 80, 120), 100);
-
-		objList[0]->ambiantReflection[0] = 0.1;
-		objList[0]->ambiantReflection[1] = 0.4;
-		objList[0]->ambiantReflection[2] = 0.4;
-		objList[0]->diffusetReflection[0] = 0;
-		objList[0]->diffusetReflection[1] = 1;
-		objList[0]->diffusetReflection[2] = 1;
-		objList[0]->specularReflection[0] = 0.2;
-		objList[0]->specularReflection[1] = 0.4;
-		objList[0]->specularReflection[2] = 0.4;
-		objList[0]->speN = 300;
-
-		objList[1]->ambiantReflection[0] = 0.6;
-		objList[1]->ambiantReflection[1] = 0.6;
-		objList[1]->ambiantReflection[2] = 0.2;
-		objList[1]->diffusetReflection[0] = 1;
-		objList[1]->diffusetReflection[1] = 1;
-		objList[1]->diffusetReflection[2] = 0;
-		objList[1]->specularReflection[0] = 0.0;
-		objList[1]->specularReflection[1] = 0.0;
-		objList[1]->specularReflection[2] = 0.0;
-		objList[1]->speN = 50;
-
-		objList[2]->ambiantReflection[0] = 0.1;
-		objList[2]->ambiantReflection[1] = 0.6;
-		objList[2]->ambiantReflection[2] = 0.1;
-		objList[2]->diffusetReflection[0] = 0.1;
-		objList[2]->diffusetReflection[1] = 1;
-		objList[2]->diffusetReflection[2] = 0.1;
-		objList[2]->specularReflection[0] = 0.3;
-		objList[2]->specularReflection[1] = 0.7;
-		objList[2]->specularReflection[2] = 0.3;
-		objList[2]->speN = 650;
-
-		objList[3]->ambiantReflection[0] = 0.3;
-		objList[3]->ambiantReflection[1] = 0.3;
-		objList[3]->ambiantReflection[2] = 0.3;
-		objList[3]->diffusetReflection[0] = 0.7;
-		objList[3]->diffusetReflection[1] = 0.7;
-		objList[3]->diffusetReflection[2] = 0.7;
-		objList[3]->specularReflection[0] = 0.6;
-		objList[3]->specularReflection[1] = 0.6;
-		objList[3]->specularReflection[2] = 0.6;
-		objList[3]->speN = 650;
-
-	}
-
-	if (i == 1)
-	{
-
-		// Step 5
-
-	}
+    glOrtho(-10, 10, -10, 10, -10, 10);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
 }
 
-void keyboard (unsigned char key, int, int)
-{
-	//keys to control scaling - k
-	//keys to control rotation - alpha
-	//keys to control translation - tx, ty
-	switch (key) {
-	case 's':
-	case 'S':
-		sceneNo = (sceneNo + 1 ) % NUM_SCENE;
-		setScene(sceneNo);
-		renderScene();
-		glutPostRedisplay();
-		break;
-	case 'q':
-	case 'Q':
-		exit(0);
+void setScene(int i = 0) {
+    if (i > NUM_SCENE) {
+        cout << "Warning: Invalid Scene Number" << endl;
+        return;
+    }
 
-		default:
-		break;
-	}
+    if (i == 0) {
+
+        ((Sphere *)objList[0])->set(Vector3(-130, 80, 120), 100);
+        ((Sphere *)objList[1])->set(Vector3(130, -80, -80), 100);
+        ((Sphere *)objList[2])->set(Vector3(-130, -80, -80), 100);
+        ((Sphere *)objList[3])->set(Vector3(130, 80, 120), 100);
+
+        objList[0]->ambiantReflection[0] = 0.1;
+        objList[0]->ambiantReflection[1] = 0.4;
+        objList[0]->ambiantReflection[2] = 0.4;
+        objList[0]->diffusetReflection[0] = 0;
+        objList[0]->diffusetReflection[1] = 1;
+        objList[0]->diffusetReflection[2] = 1;
+        objList[0]->specularReflection[0] = 0.2;
+        objList[0]->specularReflection[1] = 0.4;
+        objList[0]->specularReflection[2] = 0.4;
+        objList[0]->speN = 300;
+
+        objList[1]->ambiantReflection[0] = 0.6;
+        objList[1]->ambiantReflection[1] = 0.6;
+        objList[1]->ambiantReflection[2] = 0.2;
+        objList[1]->diffusetReflection[0] = 1;
+        objList[1]->diffusetReflection[1] = 1;
+        objList[1]->diffusetReflection[2] = 0;
+        objList[1]->specularReflection[0] = 0.0;
+        objList[1]->specularReflection[1] = 0.0;
+        objList[1]->specularReflection[2] = 0.0;
+        objList[1]->speN = 50;
+
+        objList[2]->ambiantReflection[0] = 0.1;
+        objList[2]->ambiantReflection[1] = 0.6;
+        objList[2]->ambiantReflection[2] = 0.1;
+        objList[2]->diffusetReflection[0] = 0.1;
+        objList[2]->diffusetReflection[1] = 1;
+        objList[2]->diffusetReflection[2] = 0.1;
+        objList[2]->specularReflection[0] = 0.3;
+        objList[2]->specularReflection[1] = 0.7;
+        objList[2]->specularReflection[2] = 0.3;
+        objList[2]->speN = 650;
+
+        objList[3]->ambiantReflection[0] = 0.3;
+        objList[3]->ambiantReflection[1] = 0.3;
+        objList[3]->ambiantReflection[2] = 0.3;
+        objList[3]->diffusetReflection[0] = 0.7;
+        objList[3]->diffusetReflection[1] = 0.7;
+        objList[3]->diffusetReflection[2] = 0.7;
+        objList[3]->specularReflection[0] = 0.6;
+        objList[3]->specularReflection[1] = 0.6;
+        objList[3]->specularReflection[2] = 0.6;
+        objList[3]->speN = 650;
+    }
+
+    if (i == 1) {
+
+        // Step 5
+    }
 }
 
-int main(int argc, char **argv)
-{
+void keyboard(unsigned char key, int, int) {
+    // keys to control scaling - k
+    // keys to control rotation - alpha
+    // keys to control translation - tx, ty
+    switch (key) {
+    case 's':
+    case 'S':
+        sceneNo = (sceneNo + 1) % NUM_SCENE;
+        setScene(sceneNo);
+        renderScene();
+        glutPostRedisplay();
+        break;
+    case 'q':
+    case 'Q':
+        exit(0);
 
-	
-	cout<<"<<CS3241 Lab 5>>\n\n"<<endl;
-	cout << "S to go to next scene" << endl;
-	cout << "Q to quit"<<endl;
-	glutInit(&argc, argv);
-	glutInitDisplayMode (GLUT_DOUBLE | GLUT_RGB);
-	glutInitWindowSize (WINWIDTH, WINHEIGHT);
+    default:
+        break;
+    }
+}
 
-	glutCreateWindow ("CS3241 Lab 5: Ray Tracing");
+int main(int argc, char **argv) {
 
-	glutDisplayFunc(display);
-	glutReshapeFunc(reshape);
+    cout << "<<CS3241 Lab 5>>\n\n" << endl;
+    cout << "S to go to next scene" << endl;
+    cout << "Q to quit" << endl;
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+    glutInitWindowSize(WINWIDTH, WINHEIGHT);
 
-	glutKeyboardFunc(keyboard);
+    glutCreateWindow("CS3241 Lab 5: Ray Tracing");
 
-	objList = new RtObject*[NUM_OBJECTS];
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
 
-	// create four spheres
-	objList[0] = new Sphere(Vector3(-130, 80, 120), 100);
-	objList[1] = new Sphere(Vector3(130, -80, -80), 100);
-	objList[2] = new Sphere(Vector3(-130, -80, -80), 100);
-	objList[3] = new Sphere(Vector3(130, 80, 120), 100);
+    glutKeyboardFunc(keyboard);
 
-	setScene(0);
+    objList = new RtObject *[NUM_OBJECTS];
 
-	setScene(sceneNo);
-	renderScene();
+    // create four spheres
+    objList[0] = new Sphere(Vector3(-130, 80, 120), 100);
+    objList[1] = new Sphere(Vector3(130, -80, -80), 100);
+    objList[2] = new Sphere(Vector3(-130, -80, -80), 100);
+    objList[3] = new Sphere(Vector3(130, 80, 120), 100);
 
-	glutMainLoop();
+    setScene(0);
 
-	for (int i = 0; i < NUM_OBJECTS; i++)
-		delete objList[i];
-	delete[] objList;
+    setScene(sceneNo);
+    renderScene();
 
-	delete[] pixelBuffer;
+    glutMainLoop();
 
-	return 0;
+    for (int i = 0; i < NUM_OBJECTS; i++)
+        delete objList[i];
+    delete[] objList;
+
+    delete[] pixelBuffer;
+
+    return 0;
 }
