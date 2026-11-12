@@ -56,6 +56,7 @@ authority, including VS2013's missing C++11 features and Microsoft extensions.
 | --- | --- | --- |
 | Warnings | `/W3`, full-log zero-warning gate | `-Wall -Wextra -Wpedantic -Werror` |
 | Linker warnings | Full-log zero-warning gate | `-Wl,--fatal-warnings` |
+| Compiler defaults | `/GS`, `/Oy-`, `/fp:precise`, `/EHsc` | `-fstack-protector -fno-omit-frame-pointer -fno-fast-math -fexceptions` |
 | Debug | Disabled optimisation, debug runtime/information, `_DEBUG` | `-O0 -g -D_DEBUG` |
 | Release | MaxSpeed, whole-program optimisation, function linking, intrinsics, COMDAT/reference optimisation | `-O2 -g -flto -ffunction-sections -finline-functions -Wl,--gc-sections` |
 | Release assertions | `NDEBUG` | `-DNDEBUG` |

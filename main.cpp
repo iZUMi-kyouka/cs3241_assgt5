@@ -2,6 +2,7 @@
 #include <cmath>
 #include <iostream>
 #ifdef _WIN32
+#include <windows.h>
 #include "GL/glut.h"
 #else
 #include <GL/glut.h>
@@ -175,7 +176,12 @@ void display(void)
 	glDrawPixels(WINWIDTH, WINHEIGHT, GL_RGB, GL_FLOAT, pixelBuffer);
 	glutSwapBuffers();
 	glFlush ();
-	if (std::getenv("CS3241_CHECK_GL")) {
+#ifdef _WIN32
+	const bool checkGL = GetEnvironmentVariableA("CS3241_CHECK_GL", nullptr, 0) > 0;
+#else
+	const bool checkGL = std::getenv("CS3241_CHECK_GL") != nullptr;
+#endif
+	if (checkGL) {
 		const GLenum error = glGetError();
 		if (error != GL_NO_ERROR) {
 			cerr << "OpenGL runtime error: " << error << endl;

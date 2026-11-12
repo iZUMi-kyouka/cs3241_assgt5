@@ -10,6 +10,7 @@ endif
 # The assignment uses v120 (VS2013): target its C++11-era language subset.
 # MSVC and GCC switches differ; the Windows solution remains authoritative.
 override PROJECT_FLAGS := -std=c++11 -Wall -Wextra -Wpedantic -Werror
+override PROJECT_FLAGS += -fstack-protector -fno-omit-frame-pointer -fno-fast-math -fexceptions
 override PROJECT_FLAGS += -D_CONSOLE -D_LIB -DUNICODE -D_UNICODE
 ifeq ($(CONFIG),Debug)
 override PROJECT_FLAGS += -O0 -g -D_DEBUG
