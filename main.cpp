@@ -7,6 +7,7 @@
 #include <GL/glut.h>
 #endif
 #include <cfloat>
+#include <cstdlib>
 #include "vector3D.h"
 #include <chrono>
 
@@ -170,10 +171,18 @@ void renderScene()
 
 void display(void)
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |GL_DOUBLEBUFFER);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glDrawPixels(WINWIDTH, WINHEIGHT, GL_RGB, GL_FLOAT, pixelBuffer);
 	glutSwapBuffers();
 	glFlush ();
+	if (std::getenv("CS3241_CHECK_GL")) {
+		const GLenum error = glGetError();
+		if (error != GL_NO_ERROR) {
+			cerr << "OpenGL runtime error: " << error << endl;
+			exit(EXIT_FAILURE);
+		}
+		cout << "OpenGL frame check passed: scene " << sceneNo << endl;
+	}
 } 
 
 void reshape (int w, int h)

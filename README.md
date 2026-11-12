@@ -74,14 +74,24 @@ before and only addresses modern compiler diagnostics. Redundant semicolons in
 the same header were also removed for Clang. The submission still uses
 the professor's vector library.
 
+The starter also passed `GL_DOUBLEBUFFER` to `glClear`, which is not a valid
+clear-mask bit. This was removed. Setting `CS3241_CHECK_GL=1` enables frame-level
+`glGetError` checks; the startup test enables this on both platforms.
+
 ## GitHub checks
 
 `.github/workflows/cross-platform-build.yml` checks Debug and Release on Windows
 and Linux. Windows installs the original v120 desktop toolchain from Microsoft's
-SHA-256-pinned installer; a missing toolchain or installation error fails the job
+SHA-256-pinned offline ISO and installer; a missing toolchain or installation error fails the job
 rather than silently retargeting. Both platforms also check GLUT startup.
 Windows executable, bundled DLLs, build logs, and installer diagnostics are saved
-as Actions artifacts. Startup checks do not inspect the rendered picture.
+as Actions artifacts. Each Windows job runs the actual application on the runner's
+Windows desktop, waits for a completed error-free frame, captures the 600 × 400
+client area, switches scenes with S, captures scene 1, and quits with Q (exit 0).
+Artifacts contain `screenshots/scene-0.png`, `scene-1.png`, `runtime-check.json`,
+and stdout/stderr logs. Black captures, missing frames/windows, runtime diagnostics,
+and nonzero exits fail the job. This checks startup and rendering infrastructure;
+it does not verify the unfinished assignment's ray-tracing algorithm.
 
 Like assignment 4, `make install-hooks` installs a pre-push hook that submits each
 outgoing commit to a temporary `ci-validation/*` branch and waits for all four
