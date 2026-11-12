@@ -1,0 +1,63 @@
+name: Assignment 5 build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows Win32 ${{ matrix.config }}
+    runs-on: windows-2022
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install original Visual Studio 2013 desktop C++ toolchain
+        shell: pwsh
+        run: ./scripts/install-v120.ps1
+      - name: Rebuild supplied solution with original flags and reject every warning
+        shell: pwsh
+        run: ./scripts/build-windows.ps1 -Configuration '${{ matrix.config }}'
+      - name: Check application startup and bundled runtime DLLs
+        shell: pwsh
+        run: python scripts/smoke-test.py 'build/Win32/${{ matrix.config }}/Lab5 Ray Tracing.exe'
+      - name: Upload executable, DLLs, and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-Win32-${{ matrix.config }}
+          path: |
+            build/Win32/**/*.exe
+            build/Win32/**/*.dll
+            build/Win32/**/*.log
+            build/install/**
+          if-no-files-found: error
+
+  linux:
+    name: Linux ${{ matrix.config }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build and virtual display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ make freeglut3-dev libglu1-mesa-dev xvfb xauth
+      - name: Build with fatal compiler/linker warnings and check startup
+        run: xvfb-run -a make smoke CONFIG=${{ matrix.config }}

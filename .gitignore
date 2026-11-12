@@ -1,0 +1,13 @@
+/build/
+/Debug/
+/Release/
+/.vs/
+/.idea/
+*.suo
+*.user
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.tlog/
+__pycache__/
