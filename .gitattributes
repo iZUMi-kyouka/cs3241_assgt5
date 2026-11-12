@@ -10,3 +10,4 @@ Makefile text eol=lf
 *.vcxproj -text
 *.filters -text
 /packages/** -text
+packages.config -text
