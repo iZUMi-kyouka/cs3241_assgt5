@@ -218,3 +218,42 @@ Tests saved a copy of the current `main.cpp` with no detached opening braces,
 preserved comment text and raw-string contents, and verified repeated saves are
 stable. Formatter failure aborts a save rather than silently writing unformatted
 output. Reload the helper with `:source ~/.vim/cpp-ide.vim` in existing sessions.
+
+## Camera, window sizing, and solar animation
+
+**The supplied Vector3 arithmetic operators are not const-qualified.** Adding a
+const local vector as the left operand failed compilation during scene setup.
+Use a mutable local operand; do not require changes to the professor's helper.
+Strict Linux Debug/Release builds verify this fix.
+
+**Exiting fullscreen needs freeglut's native restore operation.** Resizing and
+repositioning alone can leave Windows window decorations missing. Include
+`GL/freeglut.h` and call `glutLeaveFullScreen()` before restoring geometry. The
+extension is declared in the supplied headers and exported by the bundled x86 DLL.
+
+**A headless window at (-1, -1) can create a false screenshot border.** The
+default Xvfb window placement put the first row/column outside the desktop;
+ImageGrab filled the cropped exterior with black. Explicit initial placement
+at (40, 40) fixes capture. Inspect actual client coordinates before diagnosing
+letterboxing from a screenshot.
+Freeglut fullscreen under bare Xvfb also positioned the client at (-40, -40)
+without a window manager. Test fullscreen under a real window manager; a crop
+outside the virtual desktop cannot establish a rendering defect.
+Under Openbox, `xdotool getwindowgeometry` also included decoration offsets in
+client coordinates. The committed desktop test uses `xwininfo` absolute client
+coordinates on Linux and GetClientRect/ClientToScreen on Windows instead.
+
+**Release defines NDEBUG.** The committed renderer tests use explicit throwing
+checks, not `assert`, so Release exercises the same conditions as Debug.
+
+**Internal resolution and client dimensions must remain separate.** R now
+explicitly selects 100/90/70/50/30 percent, overriding the earlier always-native
+request. Projection uses the actual client aspect ratio, including rounding of
+internal dimensions, and presentation scales the whole image to the client area.
+Never add automatic movement-quality reduction. Home now resets the camera.
+
+**Scene switching must restore state as well as geometry.** The solar scene uses
+nine objects, an emissive Sun, and different lighting. Switching to scene 0 must
+restore its four-object count, zero emission, original lights, and original camera.
+Pixel comparisons against the student's pre-controls scene verified identical
+scene-0 output both initially and after a round trip through scene 1.

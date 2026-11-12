@@ -33,6 +33,15 @@ jobs:
         run: |
           python -m pip install Pillow==11.3.0
           python scripts/smoke-test.py 'build/Win32/${{ matrix.config }}/Lab5 Ray Tracing.exe' --screenshot-dir 'build/Win32/${{ matrix.config }}/screenshots'
+      - name: Test camera, resolution scales, fullscreen, and animated orbits on Windows
+        shell: pwsh
+        run: python scripts/interactive-test.py 'build/Win32/${{ matrix.config }}/Lab5 Ray Tracing.exe' --output 'build/Win32/${{ matrix.config }}/interactive'
+      - name: Build and run renderer regressions with the original v120 solution
+        shell: pwsh
+        run: |
+          ./scripts/build-windows.ps1 -Configuration '${{ matrix.config }}' -RendererTests
+          & 'build/Win32/${{ matrix.config }}/renderer-tests/Lab5 Ray Tracing.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Renderer regression tests failed.' }
       - name: Upload executable, DLLs, and diagnostics
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -62,6 +71,20 @@ jobs:
       - name: Install build and virtual display dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ make freeglut3-dev libglu1-mesa-dev xvfb xauth
-      - name: Build with fatal compiler/linker warnings and check startup
-        run: xvfb-run -a make smoke CONFIG=${{ matrix.config }}
+          sudo apt-get install -y g++ make freeglut3-dev libglu1-mesa-dev xvfb xauth xdotool x11-utils openbox
+          python -m pip install Pillow==11.3.0
+      - name: Build and run startup, renderer, and desktop regressions
+        run: |
+          xvfb-run -a -s '-screen 0 1280x900x24' bash -e -c '
+            openbox > /tmp/cs3241-openbox.log 2>&1 &
+            wm_pid=$!
+            trap "kill $wm_pid 2>/dev/null || true" EXIT
+            make test CONFIG=${{ matrix.config }}
+          '
+      - name: Upload desktop regression screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: linux-${{ matrix.config }}
+          path: build/linux/${{ matrix.config }}/interactive/
+          if-no-files-found: error

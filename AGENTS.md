@@ -27,8 +27,17 @@ uses a different toolset; copy its validation approach, not its compiler setting
   make the submission depend on functionality absent from the professor's helper.
 - Preserve platform-specific GLUT includes, portable timestamp types, the virtual
   object destructor, and the opt-in `CS3241_CHECK_GL` frame diagnostics.
-- Keep unfinished-step placeholders until implementing the corresponding work;
-  current screenshots legitimately show only the blue background.
+- Preserve the student's intersection, Phong, and recursive-reflection algorithms
+  when changing UI. Scene 0 retains the four original spheres; scene 1 contains
+  the Sun and eight planets with compressed relative sizes and a procedural sky.
+- Keep arrow-key movement, left-drag look, scroll zoom, S scene switching, Home
+  camera reset, Space orbit pause, and F11 fullscreen. S must not become a movement
+  key. R cycles internal scales 1.0, 0.9, 0.7, 0.5, 0.3; this explicit user request
+  supersedes the earlier always-native preference. Fill the entire client area
+  without distorting aspect ratio. Never automatically lower quality while moving.
+- Solar planets use accelerated elliptical Kepler orbits on compressed displayed
+  distances, with Earth taking 24 seconds. Keep real-time progression independent
+  of rendering speed, and preserve a static original scene 0.
 
 ## C++ formatting
 
@@ -80,6 +89,11 @@ Only report native Windows verification after both Windows jobs actually pass.
 For C++/build/startup changes, run both local configurations and startup checks.
 Do not implement ray-tracing tasks simply to make a build or startup check pass.
 Visual/rendering changes additionally need inspection of the resulting images.
+Run the committed CPU and desktop regression suites with `make test` for each
+Linux configuration under Xvfb plus Openbox (see README). Both native Windows
+configurations also run `scripts/interactive-test.py` and build the renderer
+harness through `scripts/build-windows.ps1 -RendererTests`. Keep Release checks
+enabled without relying on `assert`. Upload screenshots/reports as CI artifacts.
 
 ## Git and maintenance
 

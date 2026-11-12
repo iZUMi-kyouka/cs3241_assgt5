@@ -1,8 +1,45 @@
 # CS3241 Assignment 5 — Ray Tracing
 
 Assignment instructions: [Lab 5 Ray Tracing.pdf](Lab%205%20Ray%20Tracing.pdf).
-The ray-tracing steps are still placeholders. A passing build/startup check does
-not establish assignment correctness. Submit only `main.cpp`, as the PDF directs.
+The program includes the original four-sphere scene and a stylised solar-system
+scene. A passing build/startup check does not establish assignment correctness.
+Submit only `main.cpp`, as the PDF directs.
+
+## Camera and scenes
+
+- **Up / Down:** move forward/backward along the camera's viewing direction.
+- **Left / Right:** strafe left/right relative to the camera.
+- **Hold left mouse button and drag:** look around; pitch is limited to avoid flipping.
+- **Scroll up / down:** zoom in/out by changing the field of view.
+- **S:** switch scenes and restore that scene's starting camera.
+- **R:** cycle internal resolution: **1.0× → 0.9× → 0.7× → 0.5× → 0.3× → 1.0×**.
+- **Home:** reset the current scene's camera and zoom.
+- **Space:** pause/resume the solar-system animation.
+- **F11:** toggle fullscreen; **Q:** quit.
+
+Rendering starts at native window resolution (1.0×). R applies the selected
+multiplier to both internal dimensions; the title shows the percentage and pixel
+dimensions. The image fills the entire client area at every window size, including
+fullscreen, while preserving the vertical field of view and the shape of spheres.
+Resolution changes only when explicitly selected or when the window is resized;
+moving, looking, and zooming never automatically lower the selected quality.
+
+The second scene has an emissive Sun and eight plain-coloured planets against a
+procedural star field and Milky Way band. Relative planet sizes and orbit spacing
+are deliberately compressed for readability, rather than astronomically accurate.
+The Sun is largest, followed by Jupiter and Saturn, then the ice giants and rocky
+planets. Its position also supplies the scene's point light. Scene switching restores
+the original scene's materials, lighting, and camera.
+
+Planets follow elliptical orbits with the Sun at a focus, moving faster near the
+Sun. Approximate real eccentricities and orbital inclinations are used, while
+periods follow Kepler's third law for the compressed displayed distances: Earth
+orbits in 24 seconds, Mercury in about 10 seconds, and Neptune in about 138 seconds.
+Orbital planes are tilted toward the viewer so motion is visible. Orbital spacing
+keeps the displayed spheres from colliding. This is a stylised Kepler model, not
+an astronomical ephemeris or a gravitational simulation. The orbital model follows
+[NASA's explanation of Kepler's laws](https://science.nasa.gov/solar-system/orbits-and-keplers-laws/)
+and [JPL's elliptic-orbit equations and planetary elements](https://ssd.jpl.nasa.gov/planets/approx_pos.html).
 
 ## Linux
 
@@ -14,6 +51,7 @@ make                        # Debug build, zero warnings/errors required
 make check CONFIG=Release   # Release build, zero warnings/errors required
 make run                    # Build and launch (requires a display)
 xvfb-run -a make smoke      # Build and check startup for five seconds
+make renderer-test          # CPU camera/orbit/projection regressions
 make clean                  # Remove generated Linux outputs
 ```
 
@@ -66,6 +104,48 @@ authority, including VS2013's missing C++11 features and Microsoft extensions.
 Compiler switches, warning sets, debug runtimes, and optimisation passes cannot be
 identical across MSVC and GCC. The table states the practical equivalents; Linux
 success alone never proves the supplied Windows configuration passes.
+
+## Regression tests
+
+The committed `tests/renderer-check.cpp` checks camera movement and orthonormal
+axes, zoom limits, scene restoration, the original 600 × 400 projection pixel by
+pixel, all resolution dimensions (including a 1 × 1 client), orbital periods,
+periodicity, faster perihelion motion, and nonintersecting orbital shells.
+Checks remain active in Release builds; they do not rely on `assert`/`NDEBUG`.
+
+`scripts/interactive-test.py` drives the actual application window, captures real
+client-area screenshots, and rejects runtime diagnostics. It checks arrow and
+mouse controls, release behavior, scroll zoom, Home reset, S switching, moving
+planets, pause/resume, all five R scales and wraparound, odd-sized resize, round
+spheres, no letterboxing, fullscreen entry/exit, unchanged quality while moving,
+and clean Q exit. Reports and screenshots are written under `build/`.
+
+Run the complete Linux suite with Pillow, Xvfb, Openbox, xdotool, and x11-utils
+installed (in addition to the build dependencies):
+
+```sh
+python3 -m pip install Pillow==11.3.0
+xvfb-run -a -s '-screen 0 1280x900x24' bash -e -c '
+  openbox >/tmp/cs3241-openbox.log 2>&1 &
+  wm_pid=$!
+  trap "kill $wm_pid 2>/dev/null || true" EXIT
+  make test CONFIG=Debug
+  make test CONFIG=Release
+'
+```
+
+On native Windows, run the existing application build and smoke test, then:
+
+```powershell
+python scripts/interactive-test.py 'build/Win32/Debug/Lab5 Ray Tracing.exe' --output build/Win32/Debug/interactive
+./scripts/build-windows.ps1 -Configuration Debug -RendererTests
+& 'build/Win32/Debug/renderer-tests/Lab5 Ray Tracing.exe'
+```
+
+Repeat with `Release`. The harness builds in a separate staging directory using
+the original unmodified solution, project, v120 compiler, and configuration flags.
+The application and regression executables have separate output directories.
+All four CI jobs run these tests and upload the desktop screenshots and reports.
 
 Source compatibility fixes leave assignment behavior unfinished: portable GLUT
 includes and timestamp types, explicit `<cfloat>`, safe virtual destruction,

@@ -23,9 +23,10 @@ override PROJECT_LINK_FLAGS += -Wl,--gc-sections
 endif
 
 EXECUTABLE := build/linux/$(CONFIG)/cs3241_assgt5
+RENDERER_TEST := build/linux/$(CONFIG)/renderer-check
 SOURCES := main.cpp vector3D.cpp
 
-.PHONY: all build check run smoke verify-project clean help install-hooks
+.PHONY: all build check run smoke test renderer-test interactive-test verify-project clean help install-hooks
 all: build
 
 # Always compile, even without source changes, so checks cannot skip diagnostics.
@@ -44,6 +45,16 @@ run: build
 smoke: check
 	$(PYTHON) scripts/smoke-test.py "$(EXECUTABLE)"
 
+renderer-test: verify-project
+	@mkdir -p "$(dir $(RENDERER_TEST))"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(PROJECT_FLAGS) tests/renderer-check.cpp vector3D.cpp $(LDFLAGS) $(PROJECT_LINK_FLAGS) -lglut -lGLU -lGL -o "$(RENDERER_TEST)"
+	"$(RENDERER_TEST)"
+
+interactive-test: build
+	$(PYTHON) scripts/interactive-test.py "$(EXECUTABLE)" --output "build/linux/$(CONFIG)/interactive"
+
+test: smoke renderer-test interactive-test
+
 clean:
 	rm -rf build/linux
 
@@ -51,6 +62,6 @@ install-hooks:
 	bash scripts/install-pre-push-hook.sh
 
 help:
-	@echo "make [check|run|smoke] CONFIG=Debug|Release [CXX=g++|clang++]"
+	@echo "make [check|run|smoke|test|renderer-test|interactive-test] CONFIG=Debug|Release [CXX=g++|clang++]"
 	@echo "Both configurations reject compiler and linker warnings."
 	@echo "Headless startup check: xvfb-run -a make smoke"

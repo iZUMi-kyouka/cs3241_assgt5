@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')]
-    [string]$Configuration = 'Debug'
+    [string]$Configuration = 'Debug',
+    [switch]$RendererTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,11 +17,17 @@ if (!(Test-Path $msbuild) -or !(Test-Path $compiler)) {
 & python (Join-Path $PSScriptRoot 'verify-project.py')
 if ($LASTEXITCODE -ne 0) { throw 'Original project verification failed.' }
 
-# Reconstruct the supplied solution's expected directory layout, without editing
-# any solution/project/source/dependency bytes or changing compiler settings.
+# Reconstruct the supplied solution's expected directory layout. Application
+# builds preserve source bytes; test builds stage a separate harness below.
+# Neither mode edits the solution/project/dependencies or compiler settings.
 $stage = Join-Path $repoRoot "build\windows-project\$Configuration"
 $projectDir = Join-Path $stage 'Lab5 Ray Tracing'
 $output = Join-Path $repoRoot "build\Win32\$Configuration"
+if ($RendererTests) {
+    $stage = Join-Path $repoRoot "build\windows-renderer-tests\$Configuration"
+    $projectDir = Join-Path $stage 'Lab5 Ray Tracing'
+    $output = Join-Path $repoRoot "build\Win32\$Configuration\renderer-tests"
+}
 New-Item -ItemType Directory -Force -Path $projectDir, $output | Out-Null
 Copy-Item (Join-Path $repoRoot 'Lab5 Ray Tracing.sln') $stage -Force
 foreach ($name in @('Lab5 Ray Tracing.vcxproj', 'Lab5 Ray Tracing.vcxproj.filters', 'packages.config')) {
@@ -28,6 +35,16 @@ foreach ($name in @('Lab5 Ray Tracing.vcxproj', 'Lab5 Ray Tracing.vcxproj.filter
 }
 foreach ($name in @('main.cpp', 'vector3D.cpp', 'vector3D.h')) {
     Copy-Item (Join-Path $repoRoot $name) $stage -Force
+}
+if ($RendererTests) {
+    # Compile the regression harness through the same unmodified v120 project.
+    # Only this separate staging area's translation unit is replaced.
+    Copy-Item (Join-Path $stage 'main.cpp') (Join-Path $stage 'application-main.cpp') -Force
+    # The project compiles ../main.cpp. Put the wrapper there and adapt its one
+    # application include; leave the repository's test and application unchanged.
+    $harness = Get-Content (Join-Path $repoRoot 'tests\renderer-check.cpp') -Raw
+    $harness = $harness.Replace('#include "../main.cpp"', '#include "application-main.cpp"')
+    [System.IO.File]::WriteAllText((Join-Path $stage 'main.cpp'), $harness)
 }
 Copy-Item (Join-Path $repoRoot 'packages') $stage -Recurse -Force
 $logPath = Join-Path $output 'msbuild.log'
