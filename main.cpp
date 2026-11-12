@@ -16,6 +16,7 @@
 #include <chrono>
 #include <cstddef>
 #include <sstream>
+#include <vector>
 
 using namespace std;
 
@@ -34,6 +35,7 @@ int windowHeight = WINHEIGHT;
 const double resolutionMultipliers[5] = {1.0, 0.9, 0.7, 0.5, 0.3};
 int resolutionIndex = 0;
 float *pixelBuffer = new float[WINWIDTH * WINHEIGHT * 3];
+vector<float> presentationBuffer;
 
 class Ray { // a ray that start with "start" and going in the direction "dir"
   public:
@@ -404,6 +406,27 @@ void renderScene(bool reportTiming = true) {
     }
 }
 
+const float *windowPixels() {
+    if (renderWidth == windowWidth && renderHeight == windowHeight) {
+        return pixelBuffer;
+    }
+    // Present native-sized pixels: Windows' legacy OpenGL rounds fractional
+    // glPixelZoom endpoints down, leaving a black edge at some window sizes.
+    presentationBuffer.resize(static_cast<size_t>(windowWidth) * windowHeight * 3);
+    for (int y = 0; y < windowHeight; ++y) {
+        const size_t sourceY = static_cast<size_t>(y) * renderHeight / windowHeight;
+        for (int x = 0; x < windowWidth; ++x) {
+            const size_t sourceX = static_cast<size_t>(x) * renderWidth / windowWidth;
+            const size_t source = (sourceY * renderWidth + sourceX) * 3;
+            const size_t target = (static_cast<size_t>(y) * windowWidth + x) * 3;
+            for (int channel = 0; channel < 3; ++channel) {
+                presentationBuffer[target + channel] = pixelBuffer[source + channel];
+            }
+        }
+    }
+    return &presentationBuffer[0];
+}
+
 void display(void) {
     if (cameraNeedsRender) {
         renderScene(false);
@@ -411,10 +434,7 @@ void display(void) {
     }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glRasterPos2i(-1, -1);
-    glPixelZoom(static_cast<float>(windowWidth) / static_cast<float>(renderWidth),
-                static_cast<float>(windowHeight) / static_cast<float>(renderHeight));
-    glDrawPixels(renderWidth, renderHeight, GL_RGB, GL_FLOAT, pixelBuffer);
-    glPixelZoom(1.0f, 1.0f);
+    glDrawPixels(windowWidth, windowHeight, GL_RGB, GL_FLOAT, windowPixels());
     glutSwapBuffers();
     glFlush();
 #ifdef _WIN32

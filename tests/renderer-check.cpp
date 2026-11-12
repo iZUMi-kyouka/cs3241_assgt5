@@ -134,10 +134,25 @@ int runChecks() {
         CHECK(renderHeight == static_cast<int>(743 * resolutionMultipliers[index] + 0.5));
     }
     resolutionIndex = 4;
+    updateRenderSize(7, 5);
+    CHECK(renderWidth == 2 && renderHeight == 2);
+    for (int pixel = 0; pixel < 12; ++pixel) {
+        pixelBuffer[pixel] = static_cast<float>(pixel + 1);
+    }
+    const float *presented = windowPixels();
+    for (int y = 0; y < 5; ++y) {
+        for (int x = 0; x < 7; ++x) {
+            const int source = ((y * 2 / 5) * 2 + x * 2 / 7) * 3;
+            for (int channel = 0; channel < 3; ++channel) {
+                CHECK(presented[(y * 7 + x) * 3 + channel] == pixelBuffer[source + channel]);
+            }
+        }
+    }
     updateRenderSize(1, 1);
     CHECK(renderWidth == 1 && renderHeight == 1);
     resolutionIndex = 0;
     updateRenderSize(WINWIDTH, WINHEIGHT);
+    CHECK(windowPixels() == pixelBuffer);
     cout << "Camera, zoom, scene reset, all resolution scales, periodic Kepler orbits, faster "
             "perihelion and nonintersecting orbital shells passed."
          << endl;

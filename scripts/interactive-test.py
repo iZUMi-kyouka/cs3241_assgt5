@@ -258,7 +258,8 @@ def run(executable, output):
                     key("r")
                 image = shot(f"scale-{int(scale * 100)}")
                 check(image.size == (883, 507), f"Wrong client size: {image.size}")
-                check(image.getbbox() == (0, 0, *image.size), "Image has black border/letterboxing")
+                check(image.getbbox() == (0, 0, *image.size),
+                      f"Image has black border/letterboxing at {scale}x: bbox={image.getbbox()}, size={image.size}")
                 red, green, blue = image.split()
                 masks = [red.point(lambda x: 255 if x > 250 else 0),
                          green.point(lambda x: 255 if 190 < x < 225 else 0),
@@ -298,6 +299,9 @@ def run(executable, output):
             check(not stderr_path.read_text().strip(), "Runtime diagnostics at exit")
             report["passed"] = True
             print(json.dumps(report, indent=2))
+        except Exception as error:
+            report["error"] = str(error)
+            raise
         finally:
             if process.poll() is None:
                 process.terminate()

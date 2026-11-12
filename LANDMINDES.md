@@ -246,6 +246,15 @@ coordinates on Linux and GetClientRect/ClientToScreen on Windows instead.
 **Release defines NDEBUG.** The committed renderer tests use explicit throwing
 checks, not `assert`, so Release exercises the same conditions as Debug.
 
+**Windows OpenGL can truncate fractional glPixelZoom coverage.** The expanded
+native Windows CI caught a black rightmost column at 90% in an 883 × 507 client,
+despite Linux passing. Captures confirmed that the client coordinates were
+correct and native 100% filled the same window. Presentation now expands the
+internal image with integer nearest-neighbour indexing and submits native-sized
+pixels at unit zoom. This avoids driver-dependent endpoint rounding without
+altering the ray-traced aspect ratio or native-resolution image. CPU tests check
+every expanded pixel at odd dimensions; desktop CI still rejects any black edge.
+
 **Internal resolution and client dimensions must remain separate.** R now
 explicitly selects 100/90/70/50/30 percent, overriding the earlier always-native
 request. Projection uses the actual client aspect ratio, including rounding of
