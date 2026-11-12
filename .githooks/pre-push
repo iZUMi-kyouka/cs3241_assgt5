@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+remote_name=${1:?Git did not provide a push remote}
+workflow_file="cross-platform-build.yml"
+repo=${GH_REPO:-}
+
+if [[ "$remote_name" == "." ]]; then
+    echo "The cross-platform pre-push check requires a GitHub remote." >&2
+    exit 1
+fi
+
+declare -a commits=()
+seen_commits=" "
+
+# Git supplies one line per outgoing ref. Validate each distinct new commit.
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [[ -z "${local_sha:-}" ]] && continue
+
+    # Deleting a ref introduces no new code.
+    if [[ "$local_sha" =~ ^0+$ ]]; then
+        continue
+    fi
+
+    if ! commit_sha=$(git rev-parse --verify "${local_sha}^{commit}" 2>/dev/null); then
+        echo "Cannot resolve pushed object $local_sha to a commit." >&2
+        exit 1
+    fi
+
+    case "$seen_commits" in
+        *" $commit_sha "*) continue ;;
+    esac
+    seen_commits="${seen_commits}${commit_sha} "
+    commits+=("$commit_sha")
+done
+
+if [[ ${#commits[@]} -eq 0 ]]; then
+    exit 0
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo "GitHub CLI (gh) is required. Install it and run 'gh auth login'." >&2
+    exit 1
+fi
+
+if ! gh auth status >/dev/null 2>&1; then
+    echo "Authenticate GitHub CLI with 'gh auth login' before pushing." >&2
+    exit 1
+fi
+
+if [[ -z "$repo" ]]; then
+    if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null); then
+        echo "Could not infer the GitHub repository. Set GH_REPO=owner/repository." >&2
+        exit 1
+    fi
+fi
+
+declare -a validation_branches=()
+push_id="$$-$(date +%s)"
+
+cleanup_validation_branches() {
+    local exit_status=$?
+    trap - EXIT
+    for branch in "${validation_branches[@]}"; do
+        if ! git push --no-verify "$remote_name" --delete "$branch" >/dev/null 2>&1; then
+            echo "Warning: could not remove temporary remote branch $branch." >&2
+        fi
+    done
+    exit "$exit_status"
+}
+trap cleanup_validation_branches EXIT
+
+wait_for_workflow() {
+    local branch=$1
+    local commit=$2
+    local run_id=""
+    local attempt
+    local run_url
+
+    # Allow the push event and Actions queue time to create the run.
+    for ((attempt = 0; attempt < 120; attempt++)); do
+        if run_id=$(gh run list \
+            --repo "$repo" \
+            --workflow "$workflow_file" \
+            --branch "$branch" \
+            --event push \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty' 2>/dev/null) && [[ -n "$run_id" ]]; then
+            break
+        fi
+        sleep 5
+    done
+
+    if [[ -z "$run_id" ]]; then
+        echo "No Actions run appeared for ${commit:0:12} within 10 minutes." >&2
+        return 1
+    fi
+
+    run_url=$(gh run view "$run_id" --repo "$repo" --json url --jq .url 2>/dev/null || true)
+    echo "Watching cross-platform build: ${run_url:-run $run_id}"
+    if ! gh run watch "$run_id" --repo "$repo" --exit-status; then
+        echo "Cross-platform build failed for ${commit:0:12}; the push is blocked." >&2
+        return 1
+    fi
+}
+
+index=0
+for commit_sha in "${commits[@]}"; do
+    index=$((index + 1))
+    validation_branch="ci-validation/${commit_sha}-${push_id}-${index}"
+    echo "Checking ${commit_sha:0:12} on Windows Win32 and Linux (Debug and Release)..."
+
+    # --no-verify prevents this candidate push from invoking the hook recursively.
+    if ! git push --no-verify "$remote_name" \
+        "${commit_sha}:refs/heads/${validation_branch}"; then
+        echo "Could not push the temporary validation ref to $remote_name." >&2
+        exit 1
+    fi
+    validation_branches+=("$validation_branch")
+
+    if ! wait_for_workflow "$validation_branch" "$commit_sha"; then
+        exit 1
+    fi
+done
+
+echo "All cross-platform builds passed. Continuing the original push."

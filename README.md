@@ -70,7 +70,8 @@ Source compatibility fixes leave assignment behavior unfinished: portable GLUT
 includes and timestamp types, explicit `<cfloat>`, safe virtual destruction,
 acknowledged unused placeholders, and an explicit default copy constructor for
 the supplied vector class. The vector constructor has the same copy behavior as
-before and only addresses modern compiler diagnostics; the submission still uses
+before and only addresses modern compiler diagnostics. Redundant semicolons in
+the same header were also removed for Clang. The submission still uses
 the professor's vector library.
 
 ## GitHub checks
@@ -81,3 +82,8 @@ SHA-256-pinned installer; a missing toolchain or installation error fails the jo
 rather than silently retargeting. Both platforms also check GLUT startup.
 Windows executable, bundled DLLs, build logs, and installer diagnostics are saved
 as Actions artifacts. Startup checks do not inspect the rendered picture.
+
+Like assignment 4, `make install-hooks` installs a pre-push hook that submits each
+outgoing commit to a temporary `ci-validation/*` branch and waits for all four
+checks before pushing the requested branch. It requires authenticated GitHub CLI
+(`gh`). Main's repository rules require these checks and block force pushes.

@@ -24,7 +24,7 @@ endif
 EXECUTABLE := build/linux/$(CONFIG)/cs3241_assgt5
 SOURCES := main.cpp vector3D.cpp
 
-.PHONY: all build check run smoke verify-project clean help
+.PHONY: all build check run smoke verify-project clean help install-hooks
 all: build
 
 # Always compile, even without source changes, so checks cannot skip diagnostics.
@@ -45,6 +45,9 @@ smoke: check
 
 clean:
 	rm -rf build/linux
+
+install-hooks:
+	bash scripts/install-pre-push-hook.sh
 
 help:
 	@echo "make [check|run|smoke] CONFIG=Debug|Release [CXX=g++|clang++]"
