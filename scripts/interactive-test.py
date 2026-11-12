@@ -197,6 +197,35 @@ def run(executable, output):
             desktop.key(name)
             wait_frame(before)
 
+        def wait_motion(reference, name):
+            deadline = time.monotonic() + 30
+            previous = frames()
+            while time.monotonic() < deadline:
+                wait_frame(previous)
+                image = shot(name)
+                if changed_fraction(reference, image) > 0.001:
+                    return
+                previous = frames()
+            raise RuntimeError("Completed frames showed no orbital motion")
+
+        def wait_idle():
+            # v120 Debug can take over a second per frame on the software GL
+            # runner. Wait for pending rendering to finish rather than assuming
+            # a fixed sub-second delay means a pause key has been handled.
+            timings = re.findall(r"Rendering time = (\d+)ms", stdout_path.read_text())
+            quiet_seconds = max(0.5, int(timings[-1]) / 1000 * 2 + 0.5)
+            deadline = time.monotonic() + 30
+            previous, last_change = frames(), time.monotonic()
+            while time.monotonic() < deadline:
+                healthy()
+                current = frames()
+                if current != previous:
+                    previous, last_change = current, time.monotonic()
+                if time.monotonic() - last_change >= quiet_seconds:
+                    return
+                time.sleep(0.05)
+            raise RuntimeError("Animation did not become idle after pause")
+
         try:
             wait_frame(0)
             desktop = Desktop(process.pid)
@@ -236,18 +265,16 @@ def run(executable, output):
             key("s")
             solar = shot("solar")
             check(changed_fraction(original, solar) > 0.8, "S did not switch scenes")
-            time.sleep(1.2)
-            check(changed_fraction(solar, shot("solar-animated")) > 0.001, "Planets did not animate")
+            wait_motion(solar, "solar-animated")
             desktop.key("space")
-            time.sleep(0.5)
+            wait_idle()
             paused = shot("solar-paused")
             time.sleep(0.5)
             check(changed_fraction(paused, shot("solar-still")) == 0, "Pause did not stop planets")
             desktop.key("space")
-            time.sleep(0.6)
-            check(changed_fraction(paused, shot("solar-resumed")) > 0.001, "Resume did not restart planets")
+            wait_motion(paused, "solar-resumed")
             desktop.key("space")
-            time.sleep(0.4)
+            wait_idle()
             report["checks"].extend(["S scene switch", "orbital animation", "pause", "resume"])
 
             before = frames()

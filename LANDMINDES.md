@@ -255,6 +255,13 @@ pixels at unit zoom. This avoids driver-dependent endpoint rounding without
 altering the ray-traced aspect ratio or native-resolution image. CPU tests check
 every expanded pixel at odd dimensions; desktop CI still rejects any black edge.
 
+**Native Windows v120 Debug can take over one second per frame.** A fixed one-
+second delay after resuming animation captured the unchanged paused frame while
+the next frame was still rendering (scene-1 timing was 1058 ms). Windows Release
+passed the whole suite. The committed desktop test now waits for completed
+error-free frames and visible motion on resume, and for a quiet interval relative
+to measured frame time on pause. Motion thresholds and border checks stay strict.
+
 **Internal resolution and client dimensions must remain separate.** R now
 explicitly selects 100/90/70/50/30 percent, overriding the earlier always-native
 request. Projection uses the actual client aspect ratio, including rounding of
