@@ -1,4 +1,6 @@
 // CS3241Lab5.cpp
+// AI declaration: Codex is used to guide me along the assignment
+// as a learning tool and fix compilation error
 #include <cmath>
 #include <iostream>
 #ifdef _WIN32
@@ -119,8 +121,8 @@ double Sphere::intersectWithRay(Ray r, Vector3 &intersection, Vector3 &normal) {
     }
 
     QuadraticResult q = solveQuadraticEqn(alpha, beta, gamma);
-    double t = q.x1 < 0 ? q.x2 : q.x1;
-    if (t < 0) {
+    double t = q.x1 <= 0 ? q.x2 : q.x1;
+    if (t <= 0) {
         return -1;
     }
 
@@ -198,7 +200,9 @@ void rayTrace(Ray ray, double &r, double &g, double &b, int fromObj = -1, int le
             g += f_att * specularLight[1] * K_s[1] * maxSpecular;
             b += f_att * specularLight[2] * K_s[2] * maxSpecular;
 
-            Ray reflectionRay = Ray{intersection, R};
+            Vector3 reflected_ray = ray.dir - normal * (2.0 * dot_prod(ray.dir, normal));
+            reflected_ray.normalize();
+            Ray reflectionRay = Ray{intersection, reflected_ray};
             rayTrace(reflectionRay, lightReflectionV.x[0], lightReflectionV.x[1],
                      lightReflectionV.x[2], i, level + 1);
             r += K_s[0] * lightReflectionV.x[0];
